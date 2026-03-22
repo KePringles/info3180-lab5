@@ -8,6 +8,10 @@ This file creates your application.
 from app import app
 from flask import render_template, request, jsonify, send_file
 import os
+from app import app, db
+from werkzeug.utils import secure_filename
+from app.forms import MovieForm
+from app.models import Movie
 
 
 ###
@@ -25,6 +29,45 @@ def index():
 
 # Here we define a function to collect form errors from Flask-WTF
 # which we can later use
+
+@app.route('/api/v1/movies', methods=['POST'])
+def movies():
+    form = MovieForm()
+
+    if form.validate_on_submit():
+        title = form.title.data
+        description = form.description.data
+        poster_file = form.poster.data
+
+        filename = secure_filename(poster_file.filename)
+
+        upload_folder = os.path.join(app.root_path, 'uploads')
+        os.makedirs(upload_folder, exist_ok=True)
+
+        poster_path = os.path.join(upload_folder, filename)
+        poster_file.save(poster_path)
+
+        new_movie = Movie(
+            title=title,
+            description=description,
+            poster=filename
+        )
+
+        db.session.add(new_movie)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Movie Successfully added",
+            "title": new_movie.title,
+            "poster": new_movie.jpg,
+            "description": new_movie.description
+        }), 201
+
+    else:
+        return jsonify({
+            "errors": form_errors(form)
+        }), 400
+    
 def form_errors(form):
     error_messages = []
     """Collects form errors"""
