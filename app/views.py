@@ -5,14 +5,13 @@ Werkzeug Documentation:  https://werkzeug.palletsprojects.com/
 This file creates your application.
 """
 
-from app import app
-from flask import render_template, request, jsonify, send_file
+from app import app,db
+from flask import render_template, request, jsonify, send_file, send_from_directory
 import os
-from app import app, db
 from werkzeug.utils import secure_filename
 from app.forms import MovieForm
 from app.models import Movie
-
+from flask_wtf.csrf import generate_csrf
 
 ###
 # Routing for your application.
@@ -29,6 +28,19 @@ def index():
 
 # Here we define a function to collect form errors from Flask-WTF
 # which we can later use
+@app.route('/api/v1/movies', methods=['GET'])
+def get_movies():
+    movies = Movie.query.all()
+    movies_list = []
+    for movie in movies:
+        movies_list.append({
+            "id": movie.id,
+            "title": movie.title,
+            "description": movie.description,
+            "poster": f"/api/v1/posters/{movie.poster}"
+        })
+    return jsonify({"movies": movies_list})
+
 
 @app.route('/api/v1/movies', methods=['POST'])
 def movies():
@@ -86,6 +98,16 @@ def send_text_file(file_name):
     """Send your static text file."""
     file_dot_text = file_name + '.txt'
     return app.send_static_file(file_dot_text)
+
+@app.route('/api/v1/posters/<filename>', methods=['GET'])
+def get_poster(filename):
+    uploads_folder = os.path.join(os.getcwd(), 'uploads')
+    return send_from_directory(uploads_folder, filename)
+
+
+@app.route('/api/v1/csrf-token', methods=['GET'])
+def get_csrf():
+    return jsonify({'csrf_token': generate_csrf()})
 
 
 @app.after_request
