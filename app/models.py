@@ -1,11 +1,9 @@
-# Add any model classes for Flask-SQLAlchemy here
-
-from flask_sqlalchemy import SQLAlchemy
+from app import db
 from datetime import datetime
 
-db = SQLAlchemy()
-
 class Movie(db.Model):
+    __tablename__ = 'movies'
+    
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False)

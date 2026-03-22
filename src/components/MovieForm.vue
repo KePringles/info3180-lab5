@@ -17,6 +17,8 @@ function saveMovie() {
   let movieForm = document.getElementById("movieForm");
   let form_data = new FormData(movieForm);
 
+  form_data.append('csrf_token', csrf_token.value);
+
   fetch("/api/v1/movies", {
     method: "POST",
     body: form_data,

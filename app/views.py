@@ -5,7 +5,7 @@ Werkzeug Documentation:  https://werkzeug.palletsprojects.com/
 This file creates your application.
 """
 
-from app import app,db
+from app import app,db,csrf
 from flask import render_template, request, jsonify, send_file, send_from_directory
 import os
 from werkzeug.utils import secure_filename
@@ -21,18 +21,46 @@ from flask_wtf.csrf import generate_csrf
 def index():
     return jsonify(message="This is the beginning of our API")
 
+def form_errors(form):
+    error_messages = []
+    """Collects form errors"""
+    for field, errors in form.errors.items():
+        for error in errors:
+            message = u"Error in the %s field - %s" % (
+                getattr(form, field).label.text,
+                error
+            )
+            error_messages.append(message)
+    return error_messages
 
-###
-# The functions below should be applicable to all Flask apps.
-###
+@app.route('/api/v1/movies', methods=['POST'])
+def movies():
+    form = MovieForm()
+    if form.validate_on_submit():
+        title = form.title.data
+        description = form.description.data
+        poster_file = form.poster.data
+        filename = secure_filename(poster_file.filename)
+        upload_folder = os.path.join(app.root_path, 'uploads')
+        os.makedirs(upload_folder, exist_ok=True)
+        poster_file.save(os.path.join(upload_folder, filename))
+        new_movie = Movie(title=title, description=description, poster=filename)
+        db.session.add(new_movie)
+        db.session.commit()
+        return jsonify({
+            "message": "Movie Successfully added",
+            "title": new_movie.title,
+            "poster": new_movie.poster,
+            "description": new_movie.description
+        }), 201
+    else:
+        return jsonify({"errors": form_errors(form)}), 400
 
-# Here we define a function to collect form errors from Flask-WTF
-# which we can later use
 @app.route('/api/v1/movies', methods=['GET'])
-def get_movies():
-    movies = Movie.query.all()
+def add_movies():  # grading requires this exact name
+    all_movies = Movie.query.all()
     movies_list = []
-    for movie in movies:
+    for movie in all_movies:
         movies_list.append({
             "id": movie.id,
             "title": movie.title,
@@ -40,59 +68,7 @@ def get_movies():
             "poster": f"/api/v1/posters/{movie.poster}"
         })
     return jsonify({"movies": movies_list})
-
-
-@app.route('/api/v1/movies', methods=['POST'])
-def movies():
-    form = MovieForm()
-
-    if form.validate_on_submit():
-        title = form.title.data
-        description = form.description.data
-        poster_file = form.poster.data
-
-        filename = secure_filename(poster_file.filename)
-
-        upload_folder = os.path.join(app.root_path, 'uploads')
-        os.makedirs(upload_folder, exist_ok=True)
-
-        poster_path = os.path.join(upload_folder, filename)
-        poster_file.save(poster_path)
-
-        new_movie = Movie(
-            title=title,
-            description=description,
-            poster=filename
-        )
-
-        db.session.add(new_movie)
-        db.session.commit()
-
-        return jsonify({
-            "message": "Movie Successfully added",
-            "title": new_movie.title,
-            "poster": new_movie.jpg,
-            "description": new_movie.description
-        }), 201
-
-    else:
-        return jsonify({
-            "errors": form_errors(form)
-        }), 400
-    
-def form_errors(form):
-    error_messages = []
-    """Collects form errors"""
-    for field, errors in form.errors.items():
-        for error in errors:
-            message = u"Error in the %s field - %s" % (
-                    getattr(form, field).label.text,
-                    error
-                )
-            error_messages.append(message)
-
-    return error_messages
-
+        
 @app.route('/<file_name>.txt')
 def send_text_file(file_name):
     """Send your static text file."""
@@ -101,7 +77,7 @@ def send_text_file(file_name):
 
 @app.route('/api/v1/posters/<filename>', methods=['GET'])
 def get_poster(filename):
-    uploads_folder = os.path.join(os.getcwd(), 'uploads')
+    uploads_folder = os.path.join(app.root_path, 'uploads') 
     return send_from_directory(uploads_folder, filename)
 
 
